@@ -57,6 +57,15 @@ export function formatNumberIntoCurrency(number, currency) {
 	return ''
 }
 
+// create a function that formats numbers in thousands to k
+
+export function formatAmount(amount) {
+	if (amount > 999) {
+		return (amount / 1000).toFixed(1) + 'k'
+	}
+	return amount
+}
+
 export function convertToTitleCase(str) {
 	if (!str) {
 		return ''
@@ -82,10 +91,13 @@ export function getFileSize(file_size) {
 
 export function showToast(title, text, icon, iconClasses = null) {
 	if (!iconClasses) {
-		iconClasses =
-			icon == 'check'
-				? 'bg-green-600 text-white rounded-md p-px'
-				: 'bg-red-600 text-white rounded-md p-px'
+		if (icon == 'check') {
+			iconClasses = 'bg-green-600 text-white rounded-md p-px'
+		} else if (icon == 'circle-warn') {
+			iconClasses = 'bg-yellow-600 text-white rounded-md p-px'
+		} else {
+			iconClasses = 'bg-red-600 text-white rounded-md p-px'
+		}
 	}
 	createToast({
 		title: title,
@@ -149,9 +161,9 @@ export function getEditorTools() {
 			class: CodeBox,
 			config: {
 				themeURL:
-					'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@9.18.1/build/styles/dracula.min.css', // Optional
-				themeName: 'atom-one-dark', // Optional
-				useDefaultTheme: 'dark', // Optional. This also determines the background color of the language select drop-down
+					'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@9.18.1/build/styles/atom-one-dark.min.css',
+				themeName: 'atom-one-dark',
+				useDefaultTheme: 'dark',
 			},
 		},
 		list: {
@@ -498,4 +510,11 @@ export function singularize(word) {
 		new RegExp(`(${Object.keys(endings).join('|')})$`),
 		(r) => endings[r]
 	)
+}
+
+export const validateFile = (file) => {
+	let extension = file.name.split('.').pop().toLowerCase()
+	if (!['jpg', 'jpeg', 'png', 'webp'].includes(extension)) {
+		return __('Only image file is allowed.')
+	}
 }

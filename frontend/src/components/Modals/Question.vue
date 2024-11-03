@@ -54,7 +54,7 @@
 						:label="__('Type')"
 						v-model="question.type"
 						type="select"
-						:options="['Choices', 'User Input']"
+						:options="['Choices', 'User Input', 'Open Ended']"
 						class="pb-2"
 					/>
 					<div v-if="question.type == 'Choices'" class="divide-y border-t">
@@ -74,7 +74,11 @@
 							/>
 						</div>
 					</div>
-					<div v-else v-for="n in 4" class="space-y-2">
+					<div
+						v-else-if="question.type == 'User Input'"
+						v-for="n in 4"
+						class="space-y-2"
+					>
 						<FormControl
 							:label="__('Possibility') + ' ' + n"
 							v-model="question[`possibility_${n}`]"
@@ -212,7 +216,7 @@ const questionCreation = createResource({
 })
 
 const submitQuestion = (close) => {
-	if (questionData.data?.name) updateQuestion(close)
+	if (props.questionDetail?.question) updateQuestion(close)
 	else addQuestion(close)
 }
 
@@ -239,7 +243,7 @@ const addQuestion = (close) => {
 					)
 				},
 				onError(err) {
-					showToast(__('Error'), __(err.message?.[0] || err), 'x')
+					showToast(__('Error'), __(err.messages?.[0] || err), 'x')
 				},
 			}
 		)
@@ -259,7 +263,7 @@ const addQuestionRow = (question, close) => {
 				close()
 			},
 			onError(err) {
-				showToast(__('Error'), __(err.message?.[0] || err), 'x')
+				showToast(__('Error'), __(err.messages?.[0] || err), 'x')
 				close()
 			},
 		}
@@ -312,12 +316,11 @@ const updateQuestion = (close) => {
 							quiz.value.reload()
 							close()
 						},
-						onError(err) {
-							showToast(__('Error'), __(err.message?.[0] || err), 'x')
-							close()
-						},
 					}
 				)
+			},
+			onError(err) {
+				showToast(__('Error'), __(err.messages?.[0] || err), 'x')
 			},
 		}
 	)

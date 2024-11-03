@@ -5,7 +5,7 @@
 		<Breadcrumbs :items="breadcrumbs" />
 		<router-link
 			:to="{
-				name: 'QuizCreation',
+				name: 'QuizForm',
 				params: {
 					quizID: 'new',
 				},
@@ -19,7 +19,7 @@
 			</Button>
 		</router-link>
 	</header>
-	<div v-if="quizzes.data?.length" class="w-3/4 mx-auto py-5">
+	<div v-if="quizzes.data?.length" class="md:w-3/4 md:mx-auto py-5 mx-5">
 		<ListView
 			:columns="quizColumns"
 			:rows="quizzes.data"
@@ -36,7 +36,7 @@
 				<router-link
 					v-for="row in quizzes.data"
 					:to="{
-						name: 'QuizCreation',
+						name: 'QuizForm',
 						params: {
 							quizID: row.name,
 						},
@@ -62,6 +62,7 @@ import {
 import { useRouter } from 'vue-router'
 import { computed, inject, onMounted } from 'vue'
 import { Plus } from 'lucide-vue-next'
+import { updateDocumentTitle } from '@/utils'
 
 const user = inject('$user')
 const router = useRouter()
@@ -123,4 +124,13 @@ const breadcrumbs = computed(() => {
 		},
 	]
 })
+
+const pageMeta = computed(() => {
+	return {
+		title: __('Quizzes'),
+		description: __('List of quizzes'),
+	}
+})
+
+updateDocumentTitle(pageMeta)
 </script>

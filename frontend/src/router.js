@@ -79,8 +79,14 @@ const routes = [
 			},
 			{
 				name: 'ProfileEvaluator',
-				path: 'evaluations',
+				path: 'slots',
 				component: () => import('@/pages/ProfileEvaluator.vue'),
+			},
+			{
+				name: 'ProfileEvaluationSchedule',
+				path: 'schedule',
+				component: () =>
+					import('@/pages/ProfileEvaluationSchedule.vue'),
 			},
 		],
 	},
@@ -148,8 +154,26 @@ const routes = [
 	},
 	{
 		path: '/quizzes/:quizID',
-		name: 'QuizCreation',
-		component: () => import('@/pages/QuizCreation.vue'),
+		name: 'QuizForm',
+		component: () => import('@/pages/QuizForm.vue'),
+		props: true,
+	},
+	{
+		path: '/quiz/:quizID',
+		name: 'QuizPage',
+		component: () => import('@/pages/QuizPage.vue'),
+		props: true,
+	},
+	{
+		path: '/quiz-submissions/:quizID',
+		name: 'QuizSubmissionList',
+		component: () => import('@/pages/QuizSubmissionList.vue'),
+		props: true,
+	},
+	{
+		path: '/quiz-submission/:submission',
+		name: 'QuizSubmission',
+		component: () => import('@/pages/QuizSubmission.vue'),
 		props: true,
 	},
 ]

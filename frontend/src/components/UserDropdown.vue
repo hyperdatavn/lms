@@ -11,11 +11,11 @@
 						: 'hover:bg-gray-200 px-2 w-52'
 				"
 			>
-				<span
-					v-if="branding.data?.brand_html"
-					v-html="branding.data?.brand_html"
+				<img
+					v-if="branding.data?.banner_image"
+					:src="branding.data?.banner_image.file_url"
 					class="w-8 h-8 rounded flex-shrink-0"
-				></span>
+				/>
 				<LMSLogo v-else class="w-8 h-8 rounded flex-shrink-0" />
 				<div
 					class="flex flex-1 flex-col text-left duration-300 ease-in-out"
@@ -28,11 +28,10 @@
 					<div class="text-base font-medium text-gray-900 leading-none">
 						<span
 							v-if="
-								branding.data?.brand_name &&
-								branding.data?.brand_name != 'Frappe'
+								branding.data?.app_name && branding.data?.app_name != 'Frappe'
 							"
 						>
-							{{ branding.data?.brand_name }}
+							{{ branding.data?.app_name }}
 						</span>
 						<span v-else> Learning </span>
 					</div>
@@ -67,26 +66,20 @@ import LMSLogo from '@/components/Icons/LMSLogo.vue'
 import { sessionStore } from '@/stores/session'
 import { Dropdown } from 'frappe-ui'
 import Apps from '@/components/Apps.vue'
-import {
-	ChevronDown,
-	LogIn,
-	LogOut,
-	User,
-	ArrowRightLeft,
-	HardDriveDownload,
-	Settings,
-} from 'lucide-vue-next'
+import { ChevronDown, LogIn, LogOut, User, HardDriveDownload, Settings } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import { convertToTitleCase } from '../utils'
 import { usersStore } from '@/stores/user'
-import { ref, markRaw } from 'vue'
+import { useSettings } from '@/stores/settings'
+import { markRaw, watch, ref } from 'vue'
 import SettingsModal from '@/components/Modals/Settings.vue'
 
 const router = useRouter()
-const showSettingsModal = ref(false)
 const { logout, branding } = sessionStore()
 let { userResource } = usersStore()
+const settingsStore = useSettings()
 let { isLoggedIn } = sessionStore()
+const showSettingsModal = ref(false)
 
 const props = defineProps({
 	isCollapsed: {
@@ -94,6 +87,13 @@ const props = defineProps({
 		default: false,
 	},
 })
+
+watch(
+	() => settingsStore.isSettingsOpen,
+	(value) => {
+		showSettingsModal.value = value
+	}
+)
 
 const userDropdownOptions = [
 	{
@@ -129,7 +129,7 @@ const userDropdownOptions = [
 		icon: Settings,
 		label: 'Settings',
 		onClick: () => {
-			showSettingsModal.value = true
+			settingsStore.isSettingsOpen = true
 		},
 		condition: () => {
 			return userResource.data?.is_moderator

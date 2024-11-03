@@ -110,12 +110,13 @@ doc_events = {
 # ---------------
 scheduler_events = {
 	"hourly": [
-		"lms.lms.doctype.lms_certificate_request.lms_certificate_request.schedule_evals"
+		"lms.lms.doctype.lms_certificate_request.lms_certificate_request.schedule_evals",
+		"lms.lms.api.update_course_statistics",
 	],
 	"daily": ["lms.job.doctype.job_opportunity.job_opportunity.update_job_openings"],
 }
 
-fixtures = ["Custom Field", "Function", "Industry"]
+fixtures = ["Custom Field", "Function", "Industry", "LMS Category"]
 
 # Testing
 # -------
@@ -185,6 +186,7 @@ jinja = {
 		"lms.lms.utils.get_lesson_url",
 		"lms.page_renderers.get_profile_url",
 		"lms.overrides.user.get_palette",
+		"lms.lms.utils.is_instructor",
 	],
 	"filters": [],
 }

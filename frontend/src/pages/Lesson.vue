@@ -120,7 +120,8 @@
 				</div>
 				<div
 					v-if="
-						lesson.data.instructor_content?.blocks?.length &&
+						lesson.data.instructor_content &&
+						JSON.parse(lesson.data.instructor_content)?.blocks?.length > 1 &&
 						allowInstructorContent()
 					"
 					class="bg-gray-100 p-3 rounded-md mt-6"
@@ -244,7 +245,10 @@ const lesson = createResource({
 	onSuccess(data) {
 		lessonProgress.value = data.membership?.progress
 		if (data.content) editor.value = renderEditor('editor', data.content)
-		if (data.instructor_content?.blocks?.length)
+		if (
+			data.instructor_content &&
+			JSON.parse(data.instructor_content)?.blocks?.length > 1
+		)
 			instructorEditor.value = renderEditor(
 				'instructor-content',
 				data.instructor_content
@@ -275,7 +279,7 @@ const renderEditor = (holder, content) => {
 }
 
 const markProgress = () => {
-	if (user.data && !lesson.data?.progress) {
+	if (user.data && lesson.data && !lesson.data.progress) {
 		progress.submit()
 	}
 }
@@ -297,14 +301,14 @@ const breadcrumbs = computed(() => {
 	let items = [{ label: 'All Courses', route: { name: 'Courses' } }]
 	items.push({
 		label: lesson?.data?.course_title,
-		route: { name: 'CourseDetail', params: { course: props.courseName } },
+		route: { name: 'CourseDetail', params: { courseName: props.courseName } },
 	})
 	items.push({
 		label: lesson?.data?.title,
 		route: {
 			name: 'Lesson',
 			params: {
-				course: props.courseName,
+				courseName: props.courseName,
 				chapterNumber: props.chapterNumber,
 				lessonNumber: props.lessonNumber,
 			},
@@ -448,6 +452,10 @@ updateDocumentTitle(pageMeta)
 	max-width: unset;
 }
 
+.codex-editor__redactor {
+	padding-bottom: 0px !important;
+}
+
 .codeBoxHolder {
 	display: flex;
 	flex-direction: column;
@@ -536,5 +544,14 @@ updateDocumentTitle(pageMeta)
 .light {
 	color: #383a42;
 	background-color: #fafafa;
+}
+
+.codeBoxTextArea {
+	line-height: 1.7;
+}
+
+iframe {
+	border-top: 3px solid theme('colors.gray.700');
+	border-bottom: 3px solid theme('colors.gray.700');
 }
 </style>

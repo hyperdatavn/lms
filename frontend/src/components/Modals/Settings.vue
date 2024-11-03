@@ -6,7 +6,7 @@
 					<h1 class="mb-3 px-2 pt-2 text-lg font-semibold">
 						{{ __('Settings') }}
 					</h1>
-					<div v-for="tab in tabs">
+					<div v-for="tab in tabs" :key="tab.label">
 						<div
 							v-if="!tab.hideLabel"
 							class="mb-2 mt-3 flex cursor-pointer gap-1.5 px-1 text-base font-medium text-gray-600 transition-all duration-300 ease-in-out"
@@ -17,6 +17,7 @@
 							<SidebarLink
 								v-for="item in tab.items"
 								:link="item"
+								:key="item.label"
 								class="w-full"
 								:class="
 									activeTab?.label == item.label
@@ -30,13 +31,33 @@
 				</div>
 				<div
 					v-if="activeTab && data.doc"
-					class="flex flex-1 flex-col px-10 pt-8"
+					:key="activeTab.label"
+					class="flex flex-1 flex-col px-10 py-8"
 				>
 					<Members
 						v-if="activeTab.label === 'Members'"
 						:label="activeTab.label"
 						:description="activeTab.description"
 						v-model:show="show"
+					/>
+					<Categories
+						v-else-if="activeTab.label === 'Categories'"
+						:label="activeTab.label"
+						:description="activeTab.description"
+					/>
+					<PaymentSettings
+						v-else-if="activeTab.label === 'Payment Gateway'"
+						:label="activeTab.label"
+						:description="activeTab.description"
+						:data="data"
+						:fields="activeTab.fields"
+					/>
+					<BrandSettings
+						v-else-if="activeTab.label === 'Branding'"
+						:label="activeTab.label"
+						:description="activeTab.description"
+						:fields="activeTab.fields"
+						:data="branding"
 					/>
 					<SettingDetails
 						v-else
@@ -51,15 +72,20 @@
 	</Dialog>
 </template>
 <script setup>
-import { Dialog, createDocumentResource } from 'frappe-ui'
+import { Dialog, createDocumentResource, createResource } from 'frappe-ui'
 import { ref, computed, watch } from 'vue'
+import { useSettings } from '@/stores/settings'
 import SettingDetails from '../SettingDetails.vue'
 import SidebarLink from '@/components/SidebarLink.vue'
 import Members from '@/components/Members.vue'
+import Categories from '@/components/Categories.vue'
+import BrandSettings from '@/components/BrandSettings.vue'
+import PaymentSettings from '@/components/PaymentSettings.vue'
 
 const show = defineModel()
 const doctype = ref('LMS Settings')
 const activeTab = ref(null)
+const settingsStore = useSettings()
 
 const data = createDocumentResource({
 	doctype: doctype.value,
@@ -69,8 +95,14 @@ const data = createDocumentResource({
 	auto: true,
 })
 
-const tabs = computed(() => {
-	let _tabs = [
+const branding = createResource({
+	url: 'lms.lms.api.get_branding',
+	auto: true,
+	cache: 'brand',
+})
+
+const tabsStructure = computed(() => {
+	return [
 		{
 			label: 'Settings',
 			hideLabel: true,
@@ -80,6 +112,12 @@ const tabs = computed(() => {
 					description: 'Manage the members of your learning system',
 					icon: 'UserRoundPlus',
 				},
+			],
+		},
+		{
+			label: 'Settings',
+			hideLabel: true,
+			items: [
 				{
 					label: 'Payment Gateway',
 					icon: 'DollarSign',
@@ -87,23 +125,16 @@ const tabs = computed(() => {
 						'Configure the payment gateway and other payment related settings',
 					fields: [
 						{
-							label: 'Razorpay Key',
-							name: 'razorpay_key',
-							type: 'text',
-						},
-						{
-							label: 'Razorpay Secret',
-							name: 'razorpay_secret',
-							type: 'password',
+							label: 'Payment Gateway',
+							name: 'payment_gateway',
+							type: 'Link',
+							doctype: 'Payment Gateway',
 						},
 						{
 							label: 'Default Currency',
 							name: 'default_currency',
 							type: 'Link',
 							doctype: 'Currency',
-						},
-						{
-							type: 'Column Break',
 						},
 						{
 							label: 'Apply GST for India',
@@ -128,6 +159,60 @@ const tabs = computed(() => {
 			label: 'Settings',
 			hideLabel: true,
 			items: [
+				{
+					label: 'Categories',
+					description: 'Manage the members of your learning system',
+					icon: 'Network',
+				},
+			],
+		},
+		{
+			label: 'Customise',
+			hideLabel: false,
+			items: [
+				{
+					label: 'Branding',
+					icon: 'Blocks',
+					fields: [
+						{
+							label: 'Brand Name',
+							name: 'app_name',
+							type: 'text',
+						},
+						{
+							label: 'Logo',
+							name: 'banner_image',
+							type: 'Upload',
+						},
+						{
+							label: 'Favicon',
+							name: 'favicon',
+							type: 'Upload',
+						},
+						{
+							label: 'Footer Logo',
+							name: 'footer_logo',
+							type: 'Upload',
+						},
+						{
+							label: 'Address',
+							name: 'address',
+							type: 'textarea',
+							rows: 2,
+						},
+						{
+							label: 'Footer "Powered By"',
+							name: 'footer_powered',
+							type: 'textarea',
+							rows: 4,
+						},
+						{
+							label: 'Copyright',
+							name: 'copyright',
+							type: 'text',
+						},
+					],
+				},
 				{
 					label: 'Sidebar',
 					icon: 'PanelLeftIcon',
@@ -168,16 +253,9 @@ const tabs = computed(() => {
 						},
 					],
 				},
-			],
-		},
-		{
-			label: 'Settings',
-			hideLabel: true,
-			items: [
 				{
 					label: 'Email Templates',
 					icon: 'MailPlus',
-					description: 'Create email templates with the content you want',
 					fields: [
 						{
 							label: 'Batch Confirmation Template',
@@ -199,81 +277,51 @@ const tabs = computed(() => {
 						},
 					],
 				},
-			],
-		},
-		{
-			label: 'Settings',
-			hideLabel: true,
-			items: [
 				{
 					label: 'Signup',
 					icon: 'LogIn',
-					description:
-						'Customize the signup page to inform users about your terms and policies',
 					fields: [
 						{
-							label: 'Show terms of use on signup',
-							name: 'terms_of_use',
-							type: 'checkbox',
+							label: 'Custom Content',
+							name: 'custom_signup_content',
+							type: 'Code',
+							mode: 'htmlmixed',
+							rows: 10,
 						},
 						{
-							label: 'Terms of Use Page',
-							name: 'terms_page',
-							type: 'Link',
-							doctype: 'Web Page',
-						},
-						{
-							label: 'Show privacy policy on signup',
-							name: 'privacy_policy',
-							type: 'checkbox',
-						},
-						{
-							label: 'Privacy Policy Page',
-							name: 'privacy_policy_page',
-							type: 'Link',
-							doctype: 'Web Page',
-						},
-						{
-							type: 'Column Break',
-						},
-						{
-							label: 'Show cookie policy on signup',
-							name: 'cookie_policy',
-							type: 'checkbox',
-						},
-						{
-							label: 'Cookie Policy Page',
-							name: 'cookie_policy_page',
-							type: 'Link',
-							doctype: 'Web Page',
-						},
-						{
-							label: 'Ask user category during signup',
+							label: 'Ask for Occupation',
 							name: 'user_category',
 							type: 'checkbox',
+							description:
+								'Enable this option to ask users to select their occupation during the signup process.',
 						},
 					],
 				},
 			],
 		},
 	]
+})
 
-	return _tabs.map((tab) => {
-		tab.items = tab.items.filter((item) => {
-			if (item.condition) {
-				return item.condition()
-			}
-			return true
-		})
-		return tab
+const tabs = computed(() => {
+	return tabsStructure.value.map((tab) => {
+		return {
+			...tab,
+			items: tab.items.filter((item) => {
+				return !item.condition || item.condition()
+			}),
+		}
 	})
 })
 
-watch(show, () => {
+watch(show, async () => {
 	if (show.value) {
-		activeTab.value = tabs.value[0].items[0]
+		const currentTab = await tabs.value
+			.flatMap((tab) => tab.items)
+			.find((item) => item.label === settingsStore.activeTab)
+		activeTab.value = currentTab || tabs.value[0].items[0]
 	} else {
 		activeTab.value = null
+		settingsStore.isSettingsOpen = false
 	}
 })
 </script>

@@ -93,21 +93,19 @@
 			<div class="flex items-center mb-3">
 				<BookOpen class="h-5 w-5 stroke-1.5 text-gray-600" />
 				<span class="ml-2">
-					{{ course.data.lesson_count }} {{ __('Lessons') }}
+					{{ course.data.lessons }} {{ __('Lessons') }}
 				</span>
 			</div>
 			<div class="flex items-center mb-3">
 				<Users class="h-5 w-5 stroke-1.5 text-gray-600" />
 				<span class="ml-2">
-					{{ course.data.enrollment_count_formatted }}
+					{{ formatAmount(course.data.enrollments) }}
 					{{ __('Enrolled Students') }}
 				</span>
 			</div>
 			<div class="flex items-center">
 				<Star class="h-5 w-5 stroke-1.5 fill-orange-500 text-gray-50" />
-				<span class="ml-2">
-					{{ course.data.avg_rating }} {{ __('Rating') }}
-				</span>
+				<span class="ml-2"> {{ course.data.rating }} {{ __('Rating') }} </span>
 			</div>
 		</div>
 	</div>
@@ -116,7 +114,8 @@
 import { BookOpen, Users, Star } from 'lucide-vue-next'
 import { computed, inject } from 'vue'
 import { Button, createResource } from 'frappe-ui'
-import { createToast } from '@/utils/'
+import { showToast, formatAmount } from '@/utils/'
+import { capture } from '@/telemetry'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
@@ -138,11 +137,11 @@ const video_link = computed(() => {
 
 function enrollStudent() {
 	if (!user.data) {
-		createToast({
-			title: 'Please Login',
-			icon: 'alert-circle',
-			iconClasses: 'text-yellow-600 bg-yellow-100',
-		})
+		showToast(
+			__('Please Login'),
+			__('You need to login first to enroll for this course'),
+			'circle-warn'
+		)
 		setTimeout(() => {
 			window.location.href = `/login?redirect-to=${window.location.pathname}`
 		}, 2000)
@@ -155,11 +154,14 @@ function enrollStudent() {
 				course: props.course.data.name,
 			})
 			.then(() => {
-				createToast({
-					title: 'Enrolled Successfully',
-					icon: 'check',
-					iconClasses: 'text-green-600 bg-green-100',
+				capture('enrolled_in_course', {
+					course: props.course.data.name,
 				})
+				showToast(
+					__('Success'),
+					__('You have been enrolled in this course'),
+					'check'
+				)
 				setTimeout(() => {
 					router.push({
 						name: 'Lesson',
@@ -169,7 +171,7 @@ function enrollStudent() {
 							lessonNumber: 1,
 						},
 					})
-				}, 3000)
+				}, 2000)
 			})
 	}
 }
@@ -202,7 +204,6 @@ const certificate = createResource({
 		}
 	},
 	onSuccess(data) {
-		console.log(data)
 		window.open(
 			`/api/method/frappe.utils.print_format.download_pdf?doctype=LMS+Certificate&name=${
 				data.name

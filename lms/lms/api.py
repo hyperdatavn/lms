@@ -6,7 +6,9 @@ from frappe.translate import get_all_translations
 from frappe import _
 from frappe.query_builder import DocType
 from frappe.query_builder.functions import Count
-from frappe.utils import time_diff, now_datetime, get_datetime
+from frappe.utils import time_diff, now_datetime, get_datetime, flt
+from typing import Optional
+from lms.lms.utils import get_average_rating, get_lesson_count
 
 
 @frappe.whitelist()
@@ -288,11 +290,16 @@ def get_file_info(file_url):
 @frappe.whitelist(allow_guest=True)
 def get_branding():
 	"""Get branding details."""
-	return {
-		"brand_name": frappe.db.get_single_value("Website Settings", "app_name"),
-		"brand_html": frappe.db.get_single_value("Website Settings", "brand_html"),
-		"favicon": frappe.db.get_single_value("Website Settings", "favicon"),
-	}
+	website_settings = frappe.get_single("Website Settings")
+	image_fields = ["banner_image", "footer_logo", "favicon"]
+
+	for field in image_fields:
+		if website_settings.get(field):
+			website_settings.update({field: get_file_info(website_settings.get(field))})
+		else:
+			website_settings.update({field: None})
+
+	return website_settings
 
 
 @frappe.whitelist()
@@ -319,7 +326,7 @@ def get_evaluator_details(evaluator):
 		)
 
 	if frappe.db.exists("Course Evaluator", {"evaluator": evaluator}):
-		doc = frappe.get_doc("Course Evaluator", evaluator, as_dict=1)
+		doc = frappe.get_doc("Course Evaluator", evaluator)
 	else:
 		doc = frappe.new_doc("Course Evaluator")
 		doc.evaluator = evaluator
@@ -573,14 +580,17 @@ def get_members(start=0, search=""):
 	"""
 
 	filters = {"enabled": 1, "name": ["not in", ["Administrator", "Guest"]]}
+	or_filters = {}
 
 	if search:
-		filters["full_name"] = ["like", f"%{search}%"]
+		or_filters["full_name"] = ["like", f"%{search}%"]
+		or_filters["email"] = ["like", f"%{search}%"]
 
 	members = frappe.get_all(
 		"User",
 		filters=filters,
 		fields=["name", "full_name", "user_image", "username", "last_active"],
+		or_filters=or_filters,
 		page_length=20,
 		start=start,
 	)
@@ -610,3 +620,164 @@ def check_app_permission():
 		return True
 
 	return False
+
+
+@frappe.whitelist()
+def save_evaluation_details(
+	member,
+	course,
+	batch_name,
+	evaluator,
+	date,
+	start_time,
+	end_time,
+	status,
+	rating,
+	summary,
+):
+	"""
+	Save evaluation details for a member against a course.
+	"""
+	evaluation = frappe.db.exists(
+		"LMS Certificate Evaluation", {"member": member, "course": course}
+	)
+
+	details = {
+		"date": date,
+		"start_time": start_time,
+		"end_time": end_time,
+		"status": status,
+		"rating": rating / 5,
+		"summary": summary,
+		"batch_name": batch_name,
+	}
+
+	if evaluation:
+		frappe.db.set_value("LMS Certificate Evaluation", evaluation, details)
+		return evaluation
+	else:
+		doc = frappe.new_doc("LMS Certificate Evaluation")
+		details.update(
+			{
+				"member": member,
+				"course": course,
+				"evaluator": evaluator,
+			}
+		)
+		doc.update(details)
+		doc.insert()
+		return doc.name
+
+
+@frappe.whitelist()
+def save_certificate_details(
+	member,
+	course,
+	batch_name,
+	evaluator,
+	issue_date,
+	expiry_date,
+	template,
+	published=True,
+):
+	"""
+	Save certificate details for a member against a course.
+	"""
+	certificate = frappe.db.exists("LMS Certificate", {"member": member, "course": course})
+
+	details = {
+		"published": published,
+		"issue_date": issue_date,
+		"expiry_date": expiry_date,
+		"template": template,
+		"batch_name": batch_name,
+	}
+
+	if certificate:
+		frappe.db.set_value("LMS Certificate", certificate, details)
+		return certificate
+	else:
+		doc = frappe.new_doc("LMS Certificate")
+		details.update(
+			{
+				"member": member,
+				"course": course,
+				"evaluator": evaluator,
+			}
+		)
+		doc.update(details)
+		doc.insert()
+		return doc.name
+
+
+@frappe.whitelist()
+def delete_documents(doctype, documents):
+	frappe.only_for("Moderator")
+	for doc in documents:
+		frappe.delete_doc(doctype, doc)
+
+
+@frappe.whitelist()
+def get_payment_gateway_details(payment_gateway):
+	fields = []
+	gateway = frappe.get_doc("Payment Gateway", payment_gateway)
+
+	if gateway.gateway_controller is None:
+		try:
+			data = frappe.get_doc(f"{payment_gateway} Settings").as_dict()
+			meta = frappe.get_meta(f"{payment_gateway} Settings").fields
+			doctype = f"{payment_gateway} Settings"
+			docname = f"{payment_gateway} Settings"
+		except Exception:
+			frappe.throw(_("{0} Settings not found").format(payment_gateway))
+	else:
+		try:
+			data = frappe.get_doc(gateway.gateway_settings, gateway.gateway_controller).as_dict()
+			meta = frappe.get_meta(gateway.gateway_settings).fields
+			doctype = gateway.gateway_settings
+			docname = gateway.gateway_controller
+		except Exception:
+			frappe.throw(_("{0} Settings not found").format(payment_gateway))
+
+	for row in meta:
+		if row.fieldtype not in ["Column Break", "Section Break"]:
+			if row.fieldtype in ["Attach", "Attach Image"]:
+				fieldtype = "Upload"
+				data[row.fieldname] = get_file_info(data.get(row.fieldname))
+			else:
+				fieldtype = row.fieldtype
+
+			fields.append(
+				{
+					"label": row.label,
+					"name": row.fieldname,
+					"type": fieldtype,
+				}
+			)
+
+	return {
+		"fields": fields,
+		"data": data,
+		"doctype": doctype,
+		"docname": docname,
+	}
+
+
+def update_course_statistics():
+	courses = frappe.get_all("LMS Course", fields=["name"])
+
+	for course in courses:
+		lessons = get_lesson_count(course.name)
+
+		enrollments = frappe.db.count(
+			"LMS Enrollment", {"course": course.name, "member_type": "Student"}
+		)
+
+		avg_rating = get_average_rating(course.name) or 0
+		avg_rating = flt(avg_rating, frappe.get_system_settings("float_precision") or 3)
+
+		frappe.db.set_value(
+			"LMS Course",
+			course.name,
+			{"lessons": lessons, "enrollments": enrollments, "rating": avg_rating},
+		)

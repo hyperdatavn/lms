@@ -17,6 +17,7 @@ from frappe.utils import (
 	add_months,
 	cint,
 	cstr,
+	ceil,
 	flt,
 	fmt_money,
 	format_date,
@@ -108,7 +109,7 @@ def get_chapters(course):
 		chapter_details = frappe.db.get_value(
 			"Course Chapter",
 			{"name": chapter.chapter},
-			["name", "title", "description"],
+			["name", "title"],
 			as_dict=True,
 		)
 		chapter.update(chapter_details)
@@ -156,11 +157,12 @@ def get_lesson_details(chapter, progress=False):
 				"file_type",
 				"instructor_notes",
 				"course",
+				"content",
 			],
 			as_dict=True,
 		)
 		lesson_details.number = f"{chapter.idx}.{row.idx}"
-		lesson_details.icon = get_lesson_icon(lesson_details.body)
+		lesson_details.icon = get_lesson_icon(lesson_details.body, lesson_details.content)
 
 		if progress:
 			lesson_details.is_complete = get_progress(lesson_details.course, lesson_details.name)
@@ -169,20 +171,38 @@ def get_lesson_details(chapter, progress=False):
 	return lessons
 
 
-def get_lesson_icon(content):
-	icon = None
-	macros = find_macros(content)
+def get_lesson_icon(body, content):
+	if content:
+		content = json.loads(content)
 
+		for block in content.get("blocks"):
+			if block.get("type") == "upload" and block.get("data").get("file_type").lower() in [
+				"mp4",
+				"webm",
+				"ogg",
+				"mov",
+			]:
+				return "icon-youtube"
+
+			if block.get("type") == "embed" and block.get("data").get("service") in [
+				"youtube",
+				"vimeo",
+			]:
+				return "icon-youtube"
+
+			if block.get("type") == "quiz":
+				return "icon-quiz"
+
+		return "icon-list"
+
+	macros = find_macros(body)
 	for macro in macros:
 		if macro[0] == "YouTubeVideo" or macro[0] == "Video":
-			icon = "icon-youtube"
+			return "icon-youtube"
 		elif macro[0] == "Quiz":
-			icon = "icon-quiz"
+			return "icon-quiz"
 
-	if not icon:
-		icon = "icon-list"
-
-	return icon
+	return "icon-list"
 
 
 @frappe.whitelist(allow_guest=True)
@@ -722,17 +742,6 @@ def get_lesson_count(course):
 	return lesson_count
 
 
-def get_restriction_details():
-	user = frappe.db.get_value(
-		"User", frappe.session.user, ["profile_complete", "username"], as_dict=True
-	)
-	return {
-		"restrict": not user.profile_complete,
-		"username": user.username,
-		"prefix": frappe.get_hooks("profile_url_prefix")[0] or "/users/",
-	}
-
-
 def get_all_memberships(member):
 	return frappe.get_all(
 		"LMS Enrollment",
@@ -919,39 +928,6 @@ def get_upcoming_evals(student, courses):
 	return upcoming_evals
 
 
-@frappe.whitelist()
-def get_payment_options(doctype, docname, phone, country):
-	if not frappe.db.exists(doctype, docname):
-		frappe.throw(_("Invalid document provided."))
-
-	validate_phone_number(phone, True)
-	details = get_details(doctype, docname)
-
-	details.amount, details.currency = check_multicurrency(
-		details.amount, details.currency, country, details.amount_usd
-	)
-	if details.currency == "INR":
-		details.amount, details.gst_applied = apply_gst(details.amount, country)
-
-	client = get_client()
-	order = create_order(client, details.amount, details.currency)
-
-	options = {
-		"key_id": frappe.db.get_single_value("LMS Settings", "razorpay_key"),
-		"name": frappe.db.get_single_value("Website Settings", "app_name"),
-		"description": _("Payment for {0} course").format(details["title"]),
-		"order_id": order["id"],
-		"amount": cint(order["amount"]) * 100,
-		"currency": order["currency"],
-		"prefill": {
-			"name": frappe.db.get_value("User", frappe.session.user, "full_name"),
-			"email": frappe.session.user,
-			"contact": phone,
-		},
-	}
-	return options
-
-
 def check_multicurrency(amount, currency, country=None, amount_usd=None):
 	settings = frappe.get_single("LMS Settings")
 	show_usd_equivalent = settings.show_usd_equivalent
@@ -992,7 +968,7 @@ def check_multicurrency(amount, currency, country=None, amount_usd=None):
 	if apply_rounding and amount % 100 != 0:
 		amount = amount + 100 - amount % 100
 
-	return amount, currency
+	return ceil(amount), currency
 
 
 def apply_gst(amount, country=None):
@@ -1009,145 +985,6 @@ def apply_gst(amount, country=None):
 	return amount, gst_applied
 
 
-def get_details(doctype, docname):
-	if doctype == "LMS Course":
-		details = frappe.db.get_value(
-			"LMS Course",
-			docname,
-			["name", "title", "paid_course", "currency", "course_price as amount", "amount_usd"],
-			as_dict=True,
-		)
-		if not details.paid_course:
-			frappe.throw(_("This course is free."))
-	else:
-		details = frappe.db.get_value(
-			"LMS Batch",
-			docname,
-			["name", "title", "paid_batch", "currency", "amount", "amount_usd"],
-			as_dict=True,
-		)
-		if not details.paid_batch:
-			frappe.throw(_("To join this batch, please contact the Administrator."))
-
-	return details
-
-
-def save_address(address):
-	filters = {"email_id": frappe.session.user}
-	exists = frappe.db.exists("Address", filters)
-	if exists:
-		address_doc = frappe.get_last_doc("Address", filters=filters)
-	else:
-		address_doc = frappe.new_doc("Address")
-
-	address_doc.update(address)
-	address_doc.update(
-		{
-			"address_title": frappe.db.get_value("User", frappe.session.user, "full_name"),
-			"address_type": "Billing",
-			"is_primary_address": 1,
-			"email_id": frappe.session.user,
-		}
-	)
-	address_doc.save(ignore_permissions=True)
-	return address_doc.name
-
-
-def get_client():
-	settings = frappe.get_single("LMS Settings")
-	razorpay_key = settings.razorpay_key
-	razorpay_secret = settings.get_password("razorpay_secret", raise_exception=True)
-
-	if not razorpay_key and not razorpay_secret:
-		frappe.throw(
-			_(
-				"There is a problem with the payment gateway. Please contact the Administrator to proceed."
-			)
-		)
-
-	return razorpay.Client(auth=(razorpay_key, razorpay_secret))
-
-
-def create_order(client, amount, currency):
-	try:
-		return client.order.create(
-			{
-				"amount": cint(amount) * 100,
-				"currency": currency,
-			}
-		)
-	except Exception as e:
-		frappe.throw(
-			_(
-				"Error during payment: {0} Please contact the Administrator. Amount {1} Currency {2} Formatted {3}"
-			).format(e, amount, currency, cint(amount))
-		)
-
-
-@frappe.whitelist()
-def verify_payment(response, doctype, docname, address, order_id):
-	client = get_client()
-	client.utility.verify_payment_signature(
-		{
-			"razorpay_order_id": order_id,
-			"razorpay_payment_id": response["razorpay_payment_id"],
-			"razorpay_signature": response["razorpay_signature"],
-		}
-	)
-
-	payment = record_payment(address, response, client, doctype, docname)
-	if doctype == "LMS Course":
-		return create_membership(docname, payment)
-	else:
-		return add_student_to_batch(docname, payment)
-
-
-def record_payment(address, response, client, doctype, docname):
-	address = frappe._dict(address)
-	address_name = save_address(address)
-
-	payment_details = get_payment_details(doctype, docname, address)
-	payment_doc = frappe.new_doc("LMS Payment")
-	payment_doc.update(
-		{
-			"member": frappe.session.user,
-			"billing_name": address.billing_name,
-			"address": address_name,
-			"payment_received": 1,
-			"order_id": response["razorpay_order_id"],
-			"payment_id": response["razorpay_payment_id"],
-			"amount": payment_details["amount"],
-			"currency": payment_details["currency"],
-			"amount_with_gst": payment_details["amount_with_gst"],
-			"gstin": address.gstin,
-			"pan": address.pan,
-			"source": address.source,
-			"payment_for_document_type": doctype,
-			"payment_for_document": docname,
-		}
-	)
-	payment_doc.save(ignore_permissions=True)
-	return payment_doc
-
-
-def get_payment_details(doctype, docname, address):
-	amount_field = "course_price" if doctype == "LMS Course" else "amount"
-	amount = frappe.db.get_value(doctype, docname, amount_field)
-	currency = frappe.db.get_value(doctype, docname, "currency")
-	amount_usd = frappe.db.get_value(doctype, docname, "amount_usd")
-	amount_with_gst = 0
-
-	amount, currency = check_multicurrency(amount, currency, None, amount_usd)
-	if currency == "INR" and address.country == "India":
-		amount_with_gst, gst_applied = apply_gst(amount, address.country)
-
-	return {
-		"amount": amount,
-		"currency": currency,
-		"amount_with_gst": amount_with_gst,
-	}
-
-
 def create_membership(course, payment):
 	membership = frappe.new_doc("LMS Enrollment")
 	membership.update(
@@ -1155,24 +992,6 @@ def create_membership(course, payment):
 	)
 	membership.save(ignore_permissions=True)
 	return f"/lms/courses/{course}/learn/1-1"
-
-
-def add_student_to_batch(batchname, payment):
-	student = frappe.new_doc("Batch Student")
-	current_count = frappe.db.count("Batch Student", {"parent": batchname})
-	student.update(
-		{
-			"student": frappe.session.user,
-			"payment": payment.name,
-			"source": payment.source,
-			"parent": batchname,
-			"parenttype": "LMS Batch",
-			"parentfield": "students",
-			"idx": current_count + 1,
-		}
-	)
-	student.save(ignore_permissions=True)
-	return f"/batches/{batchname}"
 
 
 def get_current_exchange_rate(source, target="USD"):
@@ -1220,29 +1039,20 @@ def get_course_details(course):
 			"featured",
 			"disable_self_learning",
 			"published_on",
+			"category",
 			"status",
 			"paid_course",
 			"course_price",
 			"currency",
 			"amount_usd",
 			"enable_certification",
+			"lessons",
+			"enrollments",
+			"rating",
 		],
 		as_dict=1,
 	)
 	course_details.tags = course_details.tags.split(",") if course_details.tags else []
-	course_details.lesson_count = get_lesson_count(course_details.name)
-
-	course_details.enrollment_count = frappe.db.count(
-		"LMS Enrollment", {"course": course_details.name, "member_type": "Student"}
-	)
-	course_details.enrollment_count_formatted = format_number(
-		course_details.enrollment_count
-	)
-
-	avg_rating = get_average_rating(course_details.name) or 0
-	course_details.avg_rating = flt(
-		avg_rating, frappe.get_system_settings("float_precision") or 3
-	)
 
 	course_details.instructors = get_instructors(course_details.name)
 	if course_details.paid_course:
@@ -1291,14 +1101,14 @@ def get_categorized_courses(courses):
 		):
 			new.append(course)
 
-		if course.membership and course.published:
+		if course.membership:
 			enrolled.append(course)
 		elif course.is_instructor:
 			created.append(course)
 
 		categories = [live, enrolled, created]
 		for category in categories:
-			category.sort(key=lambda x: x.enrollment_count, reverse=True)
+			category.sort(key=lambda x: x.enrollments, reverse=True)
 
 		live.sort(key=lambda x: x.featured, reverse=True)
 
@@ -1323,7 +1133,7 @@ def get_course_outline(course, progress=False):
 		chapter_details = frappe.db.get_value(
 			"Course Chapter",
 			chapter.chapter,
-			["name", "title", "description"],
+			["name", "title"],
 			as_dict=True,
 		)
 		chapter_details["idx"] = chapter.idx
@@ -1775,10 +1585,11 @@ def get_order_summary(doctype, docname, country=None):
 	details.amount, details.currency = check_multicurrency(
 		details.amount, details.currency, country, details.amount_usd
 	)
+	details.original_amount = details.amount
 	details.original_amount_formatted = fmt_money(details.amount, 0, details.currency)
 
 	if details.currency == "INR":
-		details.amount, details.gst_applied = apply_gst(details.amount)
+		details.amount, details.gst_applied = apply_gst(details.amount, country)
 		details.gst_amount_formatted = fmt_money(details.gst_applied, 0, details.currency)
 
 	details.total_amount_formatted = fmt_money(details.amount, 0, details.currency)
@@ -1840,3 +1651,96 @@ def publish_notifications(doc, method):
 @frappe.whitelist()
 def get_vietqr_code():
 	return frappe.db.get_single_value("LMS Settings", "vietqr_code")
+
+def update_payment_record(doctype, docname):
+	request = frappe.get_all(
+		"Integration Request",
+		{
+			"reference_doctype": doctype,
+			"reference_docname": docname,
+			"owner": frappe.session.user,
+		},
+		order_by="creation desc",
+		limit=1,
+	)
+
+	if len(request):
+		data = frappe.db.get_value("Integration Request", request[0].name, "data")
+		data = frappe._dict(json.loads(data))
+
+		payment_gateway = data.get("payment_gateway")
+		if payment_gateway == "Razorpay":
+			payment_id = "razorpay_payment_id"
+		elif "Stripe" in payment_gateway:
+			payment_id = "stripe_token_id"
+		else:
+			payment_id = "order_id"
+
+		frappe.db.set_value(
+			"LMS Payment",
+			data.payment,
+			{
+				"payment_received": 1,
+				"payment_id": data.get(payment_id),
+				"order_id": data.get("order_id"),
+			},
+		)
+
+		try:
+			if doctype == "LMS Course":
+				enroll_in_course(data.payment, docname)
+			else:
+				enroll_in_batch(docname, data.payment)
+		except Exception as e:
+			frappe.log_error(frappe.get_traceback(), _("Enrollment Failed"))
+
+
+def enroll_in_course(payment_name, course):
+	if not frappe.db.exists(
+		"LMS Enrollment", {"member": frappe.session.user, "course": course}
+	):
+		enrollment = frappe.new_doc("LMS Enrollment")
+		payment = frappe.db.get_value(
+			"LMS Payment", payment_name, ["name", "source"], as_dict=True
+		)
+
+		enrollment.update(
+			{
+				"member": frappe.session.user,
+				"course": course,
+				"payment": payment.name,
+			}
+		)
+		enrollment.save(ignore_permissions=True)
+
+
+@frappe.whitelist()
+def enroll_in_batch(batch, payment_name=None):
+	if not frappe.db.exists(
+		"Batch Student", {"parent": batch, "student": frappe.session.user}
+	):
+		student = frappe.new_doc("Batch Student")
+		current_count = frappe.db.count("Batch Student", {"parent": batch})
+
+		student.update(
+			{
+				"student": frappe.session.user,
+				"parent": batch,
+				"parenttype": "LMS Batch",
+				"parentfield": "students",
+				"idx": current_count + 1,
+			}
+		)
+
+		if payment_name:
+			payment = frappe.db.get_value(
+				"LMS Payment", payment_name, ["name", "source"], as_dict=True
+			)
+			student.update(
+				{
+					"payment": payment.name,
+					"source": payment.source,
+				}
+			)
+
+		student.save(ignore_permissions=True)

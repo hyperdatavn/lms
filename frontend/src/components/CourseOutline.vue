@@ -4,7 +4,7 @@
 			v-if="title && (outline.data?.length || allowEdit)"
 			class="grid grid-cols-[70%,30%] mb-4 px-2"
 		>
-			<div class="font-semibold text-lg">
+			<div class="font-semibold text-lg leading-5">
 				{{ __(title) }}
 			</div>
 			<Button size="sm" v-if="allowEdit" @click="openChapterModal()">
@@ -76,7 +76,7 @@
 										<Trash2
 											v-if="allowEdit"
 											@click.prevent="trashLesson(lesson.name, chapter.name)"
-											class="h-4 w-4 stroke-1.5 text-gray-700 ml-auto invisible group-hover:visible"
+											class="h-4 w-4 text-red-500 ml-auto invisible group-hover:visible"
 										/>
 										<Check
 											v-if="lesson.is_complete"
@@ -119,7 +119,7 @@
 </template>
 <script setup>
 import { Button, createResource } from 'frappe-ui'
-import { ref } from 'vue'
+import { ref, getCurrentInstance } from 'vue'
 import Draggable from 'vuedraggable'
 import { Disclosure, DisclosureButton, DisclosurePanel } from '@headlessui/vue'
 import {
@@ -138,6 +138,8 @@ const route = useRoute()
 const expandAll = ref(true)
 const showChapterModal = ref(false)
 const currentChapter = ref(null)
+const app = getCurrentInstance()
+const { $dialog } = app.appContext.config.globalProperties
 
 const props = defineProps({
 	courseName: {
@@ -202,9 +204,23 @@ const updateLessonIndex = createResource({
 })
 
 const trashLesson = (lessonName, chapterName) => {
-	deleteLesson.submit({
-		lesson: lessonName,
-		chapter: chapterName,
+	$dialog({
+		title: __('Delete Lesson'),
+		message: __('Are you sure you want to delete this lesson?'),
+		actions: [
+			{
+				label: __('Delete'),
+				theme: 'red',
+				variant: 'solid',
+				onClick(close) {
+					deleteLesson.submit({
+						lesson: lessonName,
+						chapter: chapterName,
+					})
+					close()
+				},
+			},
+		],
 	})
 }
 
