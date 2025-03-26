@@ -22,6 +22,7 @@
 							v-model="liveClass.title"
 							:label="__('Title')"
 							class="mb-4"
+							:required="true"
 						/>
 						<Tooltip
 							:text="
@@ -35,14 +36,22 @@
 								type="time"
 								:label="__('Time')"
 								class="mb-4"
+								:required="true"
 							/>
 						</Tooltip>
-						<FormControl
-							v-model="liveClass.timezone"
-							type="select"
-							:options="getTimezoneOptions()"
-							:label="__('Timezone')"
-						/>
+
+						<div class="space-y-1.5">
+							<label class="block text-ink-gray-5 text-xs" for="batchTimezone">
+								{{ __('Timezone') }}
+								<span class="text-ink-red-3">*</span>
+							</label>
+							<Autocomplete
+								@update:modelValue="(opt) => (liveClass.timezone = opt.value)"
+								:modelValue="liveClass.timezone"
+								:options="getTimezoneOptions()"
+								:required="true"
+							/>
+						</div>
 					</div>
 					<div>
 						<FormControl
@@ -50,6 +59,7 @@
 							type="date"
 							class="mb-4"
 							:label="__('Date')"
+							:required="true"
 						/>
 						<Tooltip :text="__('Duration of the live class in minutes')">
 							<FormControl
@@ -57,6 +67,7 @@
 								v-model="liveClass.duration"
 								:label="__('Duration')"
 								class="mb-4"
+								:required="true"
 							/>
 						</Tooltip>
 						<FormControl
@@ -78,18 +89,14 @@
 </template>
 <script setup>
 import {
-	Input,
-	DatePicker,
-	Select,
-	Textarea,
 	Dialog,
 	createResource,
 	Tooltip,
 	FormControl,
+	Autocomplete,
 } from 'frappe-ui'
-import { reactive, inject } from 'vue'
-import { getTimezones, createToast } from '@/utils/'
-import { Info } from 'lucide-vue-next'
+import { reactive, inject, onMounted } from 'vue'
+import { getTimezones, createToast, getUserTimezone } from '@/utils/'
 
 const liveClasses = defineModel('reloadLiveClasses')
 const show = defineModel()
@@ -113,6 +120,10 @@ let liveClass = reactive({
 	auto_recording: 'No Recording',
 	batch: props.batch,
 	host: user.data.name,
+})
+
+onMounted(() => {
+	liveClass.timezone = getUserTimezone()
 })
 
 const getTimezoneOptions = () => {
@@ -156,25 +167,34 @@ const submitLiveClass = (close) => {
 	return createLiveClass.submit(liveClass, {
 		validate() {
 			if (!liveClass.title) {
-				return 'Please enter a title.'
+				return __('Please enter a title.')
 			}
 			if (!liveClass.date) {
-				return 'Please select a date.'
-			}
-			if (dayjs(liveClass.date).isSameOrBefore(dayjs(), 'day')) {
-				return 'Please select a future date.'
+				return __('Please select a date.')
 			}
 			if (!liveClass.time) {
-				return 'Please select a time.'
-			}
-			if (!valideTime()) {
-				return 'Please enter a valid time in the format HH:mm.'
-			}
-			if (!liveClass.duration) {
-				return 'Please select a duration.'
+				return __('Please select a time.')
 			}
 			if (!liveClass.timezone) {
-				return 'Please select a timezone.'
+				return __('Please select a timezone.')
+			}
+			if (!valideTime()) {
+				return __('Please enter a valid time in the format HH:mm.')
+			}
+			const liveClassDateTime = dayjs(`${liveClass.date}T${liveClass.time}`).tz(
+				liveClass.timezone,
+				true
+			)
+			if (
+				liveClassDateTime.isSameOrBefore(
+					dayjs().tz(liveClass.timezone, false),
+					'minute'
+				)
+			) {
+				return __('Please select a future date and time.')
+			}
+			if (!liveClass.duration) {
+				return __('Please select a duration.')
 			}
 		},
 		onSuccess() {
@@ -186,7 +206,7 @@ const submitLiveClass = (close) => {
 				title: 'Error',
 				text: err.messages?.[0] || err,
 				icon: 'x',
-				iconClasses: 'bg-red-600 text-white rounded-md p-px',
+				iconClasses: 'bg-surface-red-5 text-ink-white rounded-md p-px',
 				position: 'top-center',
 				timeout: 10,
 			})

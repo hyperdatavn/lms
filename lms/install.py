@@ -1,47 +1,17 @@
 import frappe
 from frappe.desk.page.setup_wizard.setup_wizard import add_all_roles_to
+from lms.lms.api import give_dicussions_permission
 
 
 def after_install():
-	add_pages_to_nav()
 	create_batch_source()
+	give_dicussions_permission()
 
 
 def after_sync():
 	create_lms_roles()
 	set_default_certificate_print_format()
 	add_all_roles_to("Administrator")
-
-
-def add_pages_to_nav():
-	pages = [
-		{"label": "Explore", "idx": 1},
-		{"label": "Courses", "url": "/lms/courses", "parent": "Explore", "idx": 2},
-		{"label": "Batches", "url": "/lms/batches", "parent": "Explore", "idx": 3},
-		{"label": "Statistics", "url": "/lms/statistics", "parent": "Explore", "idx": 4},
-		{"label": "Jobs", "url": "/lms/job-openings", "parent": "Explore", "idx": 5},
-	]
-
-	for page in pages:
-		filters = frappe._dict()
-		if page.get("url"):
-			filters["url"] = ["like", "%" + page.get("url") + "%"]
-		else:
-			filters["label"] = page.get("label")
-
-		if not frappe.db.exists("Top Bar Item", filters):
-			frappe.get_doc(
-				{
-					"doctype": "Top Bar Item",
-					"label": page.get("label"),
-					"url": page.get("url"),
-					"parent_label": page.get("parent"),
-					"idx": page.get("idx"),
-					"parent": "Website Settings",
-					"parenttype": "Website Settings",
-					"parentfield": "top_bar_items",
-				}
-			).save()
 
 
 def before_uninstall():
@@ -64,7 +34,9 @@ def delete_lms_roles():
 
 
 def create_course_creator_role():
-	if not frappe.db.exists("Role", "Course Creator"):
+	if frappe.db.exists("Role", "Course Creator"):
+		frappe.db.set_value("Role", "Course Creator", "desk_access", 0)
+	else:
 		role = frappe.get_doc(
 			{
 				"doctype": "Role",
@@ -77,7 +49,9 @@ def create_course_creator_role():
 
 
 def create_moderator_role():
-	if not frappe.db.exists("Role", "Moderator"):
+	if frappe.db.exists("Role", "Moderator"):
+		frappe.db.set_value("Role", "Moderator", "desk_access", 0)
+	else:
 		role = frappe.get_doc(
 			{
 				"doctype": "Role",
@@ -90,7 +64,9 @@ def create_moderator_role():
 
 
 def create_evaluator_role():
-	if not frappe.db.exists("Role", "Batch Evaluator"):
+	if frappe.db.exists("Role", "Batch Evaluator"):
+		frappe.db.set_value("Role", "Batch Evaluator", "desk_access", 0)
+	else:
 		role = frappe.new_doc("Role")
 		role.update(
 			{
@@ -103,7 +79,9 @@ def create_evaluator_role():
 
 
 def create_lms_student_role():
-	if not frappe.db.exists("Role", "LMS Student"):
+	if frappe.db.exists("Role", "LMS Student"):
+		frappe.db.set_value("Role", "LMS Student", "desk_access", 0)
+	else:
 		role = frappe.new_doc("Role")
 		role.update(
 			{

@@ -29,8 +29,8 @@
 						</CodeEditor>
 					</div>
 
-					<div v-else-if="field.type == 'Upload'">
-						<div class="text-sm text-gray-600 mb-1">
+					<div v-else-if="field.type == 'Upload'" class="space-y-2">
+						<div class="text-sm text-ink-gray-5 mb-1">
 							{{ __(field.label) }}
 						</div>
 						<FileUploader
@@ -54,21 +54,21 @@
 						<div v-else>
 							<div class="flex items-center text-sm space-x-2">
 								<div
-									class="flex items-center justify-center rounded border border-outline-gray-1 w-[15rem] py-5"
+									class="flex items-center justify-center rounded border border-outline-gray-modals w-[10rem] py-5"
 								>
 									<img :src="data[field.name]?.file_url" class="h-6 rounded" />
 								</div>
 								<div class="flex flex-col flex-wrap">
-									<span class="break-all">
+									<span class="break-all text-ink-gray-9">
 										{{ data[field.name]?.file_name }}
 									</span>
-									<span class="text-sm text-gray-500 mt-1">
+									<span class="text-sm text-ink-gray-5 mt-1">
 										{{ getFileSize(data[field.name]?.file_size) }}
 									</span>
 								</div>
 								<X
 									@click="data[field.name] = null"
-									class="bg-gray-200 rounded-md cursor-pointer stroke-1.5 w-5 h-5 p-1 ml-4"
+									class="bg-surface-gray-5 rounded-md cursor-pointer stroke-1.5 w-5 h-5 p-1 ml-4"
 								/>
 							</div>
 						</div>
@@ -90,6 +90,7 @@
 						:type="field.type"
 						:rows="field.rows"
 						:options="field.options"
+						:description="field.description"
 					/>
 				</div>
 			</div>
@@ -100,7 +101,7 @@
 import { FormControl, FileUploader, Button, Switch } from 'frappe-ui'
 import { computed } from 'vue'
 import { getFileSize, validateFile } from '@/utils'
-import { X, FileText } from 'lucide-vue-next'
+import { X } from 'lucide-vue-next'
 import Link from '@/components/Controls/Link.vue'
 import CodeEditor from '@/components/Controls/CodeEditor.vue'
 

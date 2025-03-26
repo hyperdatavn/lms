@@ -1,7 +1,9 @@
 import { toast } from 'frappe-ui'
 import { useTimeAgo } from '@vueuse/core'
 import { Quiz } from '@/utils/quiz'
+import { Assignment } from '@/utils/assignment'
 import { Upload } from '@/utils/upload'
+import { Markdown } from '@/utils/markdownParser'
 import Header from '@editorjs/header'
 import Paragraph from '@editorjs/paragraph'
 import { CodeBox } from '@/utils/code'
@@ -11,6 +13,7 @@ import { watch } from 'vue'
 import dayjs from '@/utils/dayjs'
 import Embed from '@editorjs/embed'
 import SimpleImage from '@editorjs/simple-image'
+import Table from '@editorjs/table'
 
 export function createToast(options) {
 	toast({
@@ -92,11 +95,11 @@ export function getFileSize(file_size) {
 export function showToast(title, text, icon, iconClasses = null) {
 	if (!iconClasses) {
 		if (icon == 'check') {
-			iconClasses = 'bg-green-600 text-white rounded-md p-px'
-		} else if (icon == 'circle-warn') {
-			iconClasses = 'bg-yellow-600 text-white rounded-md p-px'
+			iconClasses = 'bg-surface-green-3 text-ink-white rounded-md p-px'
+		} else if (icon == 'alert-circle') {
+			iconClasses = 'bg-yellow-600 text-ink-white rounded-md p-px'
 		} else {
-			iconClasses = 'bg-red-600 text-white rounded-md p-px'
+			iconClasses = 'bg-surface-red-5 text-ink-white rounded-md p-px'
 		}
 	}
 	createToast({
@@ -146,10 +149,24 @@ export function htmlToText(html) {
 
 export function getEditorTools() {
 	return {
-		header: Header,
+		header: {
+			class: Header,
+			config: {
+				placeholder: 'Header',
+			},
+		},
 		quiz: Quiz,
+		assignment: Assignment,
 		upload: Upload,
+		markdown: {
+			class: Markdown,
+			inlineToolbar: true,
+		},
 		image: SimpleImage,
+		table: {
+			class: Table,
+			inlineToolbar: true,
+		},
 		paragraph: {
 			class: Paragraph,
 			inlineToolbar: true,
@@ -160,14 +177,12 @@ export function getEditorTools() {
 		codeBox: {
 			class: CodeBox,
 			config: {
-				themeURL:
-					'https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@9.18.1/build/styles/atom-one-dark.min.css',
-				themeName: 'atom-one-dark',
 				useDefaultTheme: 'dark',
 			},
 		},
 		list: {
 			class: NestedList,
+			inlineToolbar: true,
 			config: {
 				defaultStyle: 'ordered',
 			},
@@ -426,6 +441,22 @@ export function getTimezones() {
 	]
 }
 
+export function getUserTimezone() {
+	try {
+		const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+		const supportedTimezones = getTimezones()
+
+		if (supportedTimezones.includes(timezone)) {
+			return timezone // e.g., 'Asia/Calcutta', 'America/New_York', etc.
+		} else {
+			throw Error('unsupported timezone')
+		}
+	} catch (error) {
+		console.error('Error getting timezone:', error)
+		return null
+	}
+}
+
 export function getSidebarLinks() {
 	return [
 		{
@@ -517,4 +548,22 @@ export const validateFile = (file) => {
 	if (!['jpg', 'jpeg', 'png', 'webp'].includes(extension)) {
 		return __('Only image file is allowed.')
 	}
+}
+
+export const escapeHTML = (text) => {
+	if (!text) return ''
+	let escape_html_mapping = {
+		'&': '&amp;',
+		'<': '&lt;',
+		'>': '&gt;',
+		'"': '&quot;',
+		"'": '&#39;',
+		'`': '&#x60;',
+		'=': '&#x3D;',
+	}
+
+	return String(text).replace(
+		/[&<>"'`=]/g,
+		(char) => escape_html_mapping[char] || char
+	)
 }

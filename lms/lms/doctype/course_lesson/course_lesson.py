@@ -52,7 +52,6 @@ class CourseLesson(Document):
 			ex.lesson = None
 			ex.course = None
 			ex.index_ = 0
-			ex.index_label = ""
 			ex.save(ignore_permissions=True)
 
 	def check_and_create_folder(self):
@@ -73,16 +72,6 @@ class CourseLesson(Document):
 		exercises = [value for name, value in macros if name == "Exercise"]
 		return [frappe.get_doc("LMS Exercise", name) for name in exercises]
 
-	def get_progress(self):
-		return frappe.db.get_value(
-			"LMS Course Progress", {"lesson": self.name, "owner": frappe.session.user}, "status"
-		)
-
-	def get_slugified_class(self):
-		if self.get_progress():
-			return ("").join([s for s in self.get_progress().lower().split()])
-		return
-
 
 @frappe.whitelist()
 def save_progress(lesson, course):
@@ -90,27 +79,25 @@ def save_progress(lesson, course):
 		"LMS Enrollment", {"course": course, "member": frappe.session.user}
 	)
 	if not membership:
-		return
-
-	frappe.db.set_value("LMS Enrollment", membership, "current_lesson", lesson)
-
-	quiz_completed = get_quiz_progress(lesson)
-	if not quiz_completed:
 		return 0
 
-	if frappe.db.exists(
+	frappe.db.set_value("LMS Enrollment", membership, "current_lesson", lesson)
+	already_completed = frappe.db.exists(
 		"LMS Course Progress", {"lesson": lesson, "member": frappe.session.user}
-	):
-		return
+	)
 
-	frappe.get_doc(
-		{
-			"doctype": "LMS Course Progress",
-			"lesson": lesson,
-			"status": "Complete",
-			"member": frappe.session.user,
-		}
-	).save(ignore_permissions=True)
+	quiz_completed = get_quiz_progress(lesson)
+	assignment_completed = get_assignment_progress(lesson)
+
+	if not already_completed and quiz_completed and assignment_completed:
+		frappe.get_doc(
+			{
+				"doctype": "LMS Course Progress",
+				"lesson": lesson,
+				"status": "Complete",
+				"member": frappe.session.user,
+			}
+		).save(ignore_permissions=True)
 
 	progress = get_course_progress(course)
 	capture_progress_for_analytics(progress, course)
@@ -155,6 +142,32 @@ def get_quiz_progress(lesson):
 				"member": frappe.session.user,
 				"percentage": [">=", passing_percentage],
 			},
+		):
+			return False
+	return True
+
+
+def get_assignment_progress(lesson):
+	lesson_details = frappe.db.get_value(
+		"Course Lesson", lesson, ["body", "content"], as_dict=1
+	)
+	assignments = []
+
+	if lesson_details.content:
+		content = json.loads(lesson_details.content)
+
+		for block in content.get("blocks"):
+			if block.get("type") == "assignment":
+				assignments.append(block.get("data").get("assignment"))
+
+	elif lesson_details.body:
+		macros = find_macros(lesson_details.body)
+		assignments = [value for name, value in macros if name == "Assignment"]
+
+	for assignment in assignments:
+		if not frappe.db.exists(
+			"LMS Assignment Submission",
+			{"assignment": assignment, "member": frappe.session.user},
 		):
 			return False
 	return True

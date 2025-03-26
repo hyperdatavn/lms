@@ -4,7 +4,7 @@
 			<div class="space-y-4">
 				<div
 					v-if="!editMode"
-					class="flex items-center text-xs text-gray-700 space-x-5"
+					class="flex items-center text-xs text-ink-gray-7 space-x-5"
 				>
 					<div class="flex items-center space-x-2">
 						<input
@@ -12,9 +12,9 @@
 							id="existing"
 							value="existing"
 							v-model="questionType"
-							class="w-3 h-3 accent-gray-900"
+							class="w-3 h-3 cursor-pointer"
 						/>
-						<label for="existing">
+						<label for="existing" class="cursor-pointer">
 							{{ __('Add an existing question') }}
 						</label>
 					</div>
@@ -25,16 +25,16 @@
 							id="new"
 							value="new"
 							v-model="questionType"
-							class="w-3 h-3"
+							class="w-3 h-3 cursor-pointer"
 						/>
-						<label for="new">
+						<label for="new" class="cursor-pointer">
 							{{ __('Create a new question') }}
 						</label>
 					</div>
 				</div>
 				<div v-if="questionType == 'new' || editMode" class="space-y-2">
 					<div>
-						<label class="block text-xs text-gray-600 mb-1">
+						<label class="block text-xs text-ink-gray-5 mb-1">
 							{{ __('Question') }}
 						</label>
 						<TextEditor
@@ -42,7 +42,7 @@
 							@change="(val) => (question.question = val)"
 							:editable="true"
 							:fixedMenu="true"
-							editorClass="prose-sm max-w-none border-b border-x bg-gray-100 rounded-b-md py-1 px-2 min-h-[7rem]"
+							editorClass="prose-sm max-w-none border-b border-x bg-surface-gray-2 rounded-b-md py-1 px-2 min-h-[7rem]"
 						/>
 					</div>
 					<FormControl
@@ -56,12 +56,14 @@
 						type="select"
 						:options="['Choices', 'User Input', 'Open Ended']"
 						class="pb-2"
+						:required="true"
 					/>
 					<div v-if="question.type == 'Choices'" class="divide-y border-t">
 						<div v-for="n in 4" class="space-y-4 py-2">
 							<FormControl
 								:label="__('Option') + ' ' + n"
 								v-model="question[`option_${n}`]"
+								:required="n <= 2 ? true : false"
 							/>
 							<FormControl
 								:label="__('Explanation')"
@@ -82,6 +84,7 @@
 						<FormControl
 							:label="__('Possibility') + ' ' + n"
 							v-model="question[`possibility_${n}`]"
+							:required="n == 1 ? true : false"
 						/>
 					</div>
 				</div>
@@ -127,7 +130,7 @@ const populateFields = () => {
 	let counter = 1
 	fields.forEach((field) => {
 		while (counter <= 4) {
-			question[`${field}_${counter}`] = field === 'is_correct' ? false : ''
+			question[`${field}_${counter}`] = field === 'is_correct' ? false : null
 			counter++
 		}
 	})

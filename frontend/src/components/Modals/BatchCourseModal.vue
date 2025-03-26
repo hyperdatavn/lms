@@ -14,7 +14,12 @@
 		}"
 	>
 		<template #body-content>
-			<Link doctype="LMS Course" v-model="course" :label="__('Course')" />
+			<Link
+				doctype="LMS Course"
+				v-model="course"
+				:label="__('Course')"
+				:required="true"
+			/>
 			<Link
 				doctype="Course Evaluator"
 				v-model="evaluator"
@@ -26,7 +31,7 @@
 </template>
 <script setup>
 import { Dialog, createResource } from 'frappe-ui'
-import { ref, defineModel } from 'vue'
+import { ref } from 'vue'
 import Link from '@/components/Controls/Link.vue'
 import { showToast } from '@/utils'
 

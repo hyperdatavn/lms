@@ -1,7 +1,7 @@
 <template>
 	<div v-if="quiz.data">
 		<div
-			class="bg-blue-100 space-y-1 py-2 px-2 mb-4 rounded-md text-sm text-blue-800"
+			class="bg-surface-blue-2 space-y-1 py-2 px-2 mb-4 rounded-md text-sm text-ink-blue-800"
 		>
 			<div class="leading-5">
 				{{
@@ -40,12 +40,14 @@
 			</div>
 		</div>
 
-		<div v-if="quiz.data.duration" class="flex items-center space-x-2 my-4">
-			<span class="text-gray-600 text-xs"> {{ __('Time') }}: </span>
+		<div v-if="quiz.data.duration" class="flex flex-col space-x-1 my-4">
+			<div class="mb-2">
+				<span class=""> {{ __('Time') }}: </span>
+				<span class="font-semibold">
+					{{ formatTimer(timer) }}
+				</span>
+			</div>
 			<ProgressBar :progress="timerProgress" />
-			<span class="font-semibold">
-				{{ formatTimer(timer) }}
-			</span>
 		</div>
 
 		<div v-if="activeQuestion == 0">
@@ -81,7 +83,7 @@
 					class="border rounded-md p-5"
 				>
 					<div class="flex justify-between">
-						<div class="text-sm text-gray-600">
+						<div class="text-sm text-ink-gray-5">
 							<span class="mr-2">
 								{{ __('Question {0}').format(activeQuestion) }}:
 							</span>
@@ -89,25 +91,25 @@
 								{{ getInstructions(questionDetails.data) }}
 							</span>
 						</div>
-						<div class="text-gray-900 text-sm font-semibold item-left">
+						<div class="text-ink-gray-9 text-sm font-semibold item-left">
 							{{ question.marks }}
 							{{ question.marks == 1 ? __('Mark') : __('Marks') }}
 						</div>
 					</div>
 					<div
-						class="text-gray-900 font-semibold mt-2 leading-5"
+						class="text-ink-gray-9 font-semibold mt-2 leading-5"
 						v-html="questionDetails.data.question"
 					></div>
 					<div v-if="questionDetails.data.type == 'Choices'" v-for="index in 4">
 						<label
 							v-if="questionDetails.data[`option_${index}`]"
-							class="flex items-center bg-gray-200 rounded-md p-3 mt-4 w-full cursor-pointer focus:border-blue-600"
+							class="flex items-center bg-surface-gray-3 rounded-md p-3 mt-4 w-full cursor-pointer focus:border-blue-600"
 						>
 							<input
 								v-if="!showAnswers.length && !questionDetails.data.multiple"
 								type="radio"
 								:name="encodeURIComponent(questionDetails.data.question)"
-								class="w-3.5 h-3.5 text-gray-900 focus:ring-gray-200"
+								class="w-3.5 h-3.5 text-ink-gray-9 focus:ring-outline-gray-modals"
 								@change="markAnswer(index)"
 							/>
 
@@ -115,23 +117,25 @@
 								v-else-if="!showAnswers.length && questionDetails.data.multiple"
 								type="checkbox"
 								:name="encodeURIComponent(questionDetails.data.question)"
-								class="w-3.5 h-3.5 text-gray-900 rounded-sm focus:ring-gray-200"
+								class="w-3.5 h-3.5 text-ink-gray-9 rounded-sm focus:ring-outline-gray-modals"
 								@change="markAnswer(index)"
 							/>
-
 							<div
 								v-else-if="quiz.data.show_answers"
 								v-for="(answer, idx) in showAnswers"
 							>
 								<div v-if="index - 1 == idx">
-									<CheckCircle v-if="answer" class="w-4 h-4 text-green-500" />
+									<CheckCircle
+										v-if="answer == 1"
+										class="w-4 h-4 text-ink-green-2"
+									/>
 									<MinusCircle
-										v-else-if="questionDetails.data[`is_correct_${index}`]"
-										class="w-4 h-4 text-green-500"
+										v-else-if="answer == 2"
+										class="w-4 h-4 text-ink-green-2"
 									/>
 									<XCircle
 										v-else-if="answer == 0"
-										class="w-4 h-4 text-red-500"
+										class="w-4 h-4 text-ink-red-3"
 									/>
 									<MinusCircle v-else class="w-4 h-4" />
 								</div>
@@ -160,12 +164,12 @@
 						<div v-if="showAnswers.length">
 							<Badge v-if="showAnswers[0]" :label="__('Correct')" theme="green">
 								<template #prefix>
-									<CheckCircle class="w-4 h-4 text-green-500 mr-1" />
+									<CheckCircle class="w-4 h-4 text-ink-green-2 mr-1" />
 								</template>
 							</Badge>
 							<Badge v-else theme="red" :label="__('Incorrect')">
 								<template #prefix>
-									<XCircle class="w-4 h-4 text-red-500 mr-1" />
+									<XCircle class="w-4 h-4 text-ink-red-3 mr-1" />
 								</template>
 							</Badge>
 						</div>
@@ -177,11 +181,11 @@
 							@change="(val) => (possibleAnswer = val)"
 							:editable="true"
 							:fixedMenu="true"
-							editorClass="prose-sm max-w-none border-b border-x bg-gray-100 rounded-b-md py-1 px-2 min-h-[7rem]"
+							editorClass="prose-sm max-w-none border-b border-x bg-surface-gray-2 rounded-b-md py-1 px-2 min-h-[7rem]"
 						/>
 					</div>
 					<div class="flex items-center justify-between mt-4">
-						<div class="text-sm text-gray-600">
+						<div class="text-sm text-ink-gray-5">
 							{{
 								__('Question {0} of {1}').format(
 									activeQuestion,
@@ -203,7 +207,7 @@
 						</Button>
 						<Button
 							v-else-if="activeQuestion != questions.length"
-							@click="nextQuetion()"
+							@click="nextQuestion()"
 						>
 							<span>
 								{{ __('Next') }}
@@ -254,14 +258,22 @@
 			</Button>
 		</div>
 		<div
-			v-if="quiz.data.show_submission_history && attempts?.data"
+			v-if="
+				quiz.data.show_submission_history &&
+				attempts?.data &&
+				attempts.data.length > 0
+			"
 			class="mt-10"
 		>
 			<ListView
 				:columns="getSubmissionColumns()"
 				:rows="attempts?.data"
 				row-key="name"
-				:options="{ selectable: false, showTooltip: false }"
+				:options="{
+					selectable: false,
+					showTooltip: false,
+					emptyState: { title: __('No Quiz submissions found') },
+				}"
 			>
 			</ListView>
 		</div>
@@ -271,15 +283,17 @@
 import {
 	Badge,
 	Button,
+	call,
 	createResource,
 	ListView,
 	TextEditor,
 	FormControl,
 } from 'frappe-ui'
 import { ref, watch, reactive, inject, computed } from 'vue'
-import { createToast } from '@/utils/'
+import { createToast, showToast } from '@/utils/'
 import { CheckCircle, XCircle, MinusCircle } from 'lucide-vue-next'
 import { timeAgo } from '@/utils'
+import { useRouter } from 'vue-router'
 import ProgressBar from '@/components/ProgressBar.vue'
 
 const user = inject('$user')
@@ -291,6 +305,7 @@ let questions = reactive([])
 const possibleAnswer = ref(null)
 const timer = ref(0)
 let timerInterval = null
+const router = useRouter()
 
 const props = defineProps({
 	quizName: {
@@ -309,6 +324,9 @@ const quiz = createResource({
 	},
 	cache: ['quiz', props.quizName],
 	auto: true,
+	transform(data) {
+		data.duration = parseInt(data.duration)
+	},
 	onSuccess(data) {
 		populateQuestions()
 		setupTimer()
@@ -397,6 +415,9 @@ const attempts = createResource({
 watch(
 	() => quiz.data,
 	() => {
+		if (quiz.data) {
+			populateQuestions()
+		}
 		if (quiz.data && quiz.data.max_attempts) {
 			attempts.reload()
 			resetQuiz()
@@ -493,8 +514,8 @@ const checkAnswer = () => {
 				selectedOptions.forEach((option, index) => {
 					if (option) {
 						showAnswers[index] = option && data[index]
-					} else if (questionDetails.data[`is_correct_${index + 1}`]) {
-						showAnswers[index] = 0
+					} else if (data[index] == 2) {
+						showAnswers[index] = 2
 					} else {
 						showAnswers[index] = undefined
 					}
@@ -523,7 +544,7 @@ const addToLocalStorage = () => {
 	localStorage.setItem(quiz.data.title, JSON.stringify(quizData))
 }
 
-const nextQuetion = () => {
+const nextQuestion = () => {
 	if (!quiz.data.show_answers && questionDetails.data?.type != 'Open Ended') {
 		checkAnswer()
 	} else {
@@ -557,8 +578,19 @@ const createSubmission = () => {
 		{},
 		{
 			onSuccess(data) {
+				markLessonProgress()
 				if (quiz.data && quiz.data.max_attempts) attempts.reload()
 				if (quiz.data.duration) clearInterval(timerInterval)
+			},
+			onError(err) {
+				const errorTitle = err?.message || ''
+				if (errorTitle.includes('MaximumAttemptsExceededError')) {
+					const errorMessage = err.messages?.[0] || err
+					showToast(__('Error'), __(errorMessage), 'x')
+					setTimeout(() => {
+						window.location.reload()
+					}, 3000)
+				}
 			},
 		}
 	)
@@ -578,6 +610,17 @@ const getInstructions = (question) => {
 		if (question.multiple) return __('Choose all answers that apply')
 		else return __('Choose one answer')
 	else return __('Type your answer')
+}
+
+const markLessonProgress = () => {
+	console.log(router)
+	if (router.currentRoute.value.name == 'Lesson') {
+		call('lms.lms.api.mark_lesson_progress', {
+			course: router.currentRoute.value.params.courseName,
+			chapter_number: router.currentRoute.value.params.chapterNumber,
+			lesson_number: router.currentRoute.value.params.lessonNumber,
+		})
+	}
 }
 
 const getSubmissionColumns = () => {

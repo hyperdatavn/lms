@@ -1,10 +1,13 @@
 <template>
 	<header
-		class="sticky top-0 z-10 flex items-center justify-between border-b bg-white px-3 py-2.5 sm:px-5"
+		class="sticky top-0 z-10 flex items-center justify-between border-b bg-surface-white px-3 py-2.5 sm:px-5"
 	>
 		<Breadcrumbs :items="breadcrumbs" />
 	</header>
 	<div v-if="submissions.data?.length" class="md:w-3/4 md:mx-auto py-5 mx-5">
+		<div class="text-xl font-semibold mb-5">
+			{{ submissions.data[0].quiz_title }}
+		</div>
 		<ListView
 			:columns="quizColumns"
 			:rows="submissions.data"
@@ -12,7 +15,7 @@
 			:options="{ showTooltip: false, selectable: false }"
 		>
 			<ListHeader
-				class="mb-2 grid items-center space-x-4 rounded bg-gray-100 p-2"
+				class="mb-2 grid items-center space-x-4 rounded bg-surface-gray-2 p-2"
 			>
 				<ListHeaderItem :item="item" v-for="item in quizColumns">
 				</ListHeaderItem>
@@ -31,12 +34,18 @@
 				</router-link>
 			</ListRows>
 		</ListView>
+		<div class="flex justify-center my-5">
+			<Button v-if="submissions.hasNextPage" @click="submissions.next()">
+				{{ __('Load More') }}
+			</Button>
+		</div>
 	</div>
 </template>
 <script setup>
 import {
 	createListResource,
 	Breadcrumbs,
+	Button,
 	ListView,
 	ListRow,
 	ListRows,
@@ -76,12 +85,7 @@ const quizColumns = computed(() => {
 		{
 			label: __('Member'),
 			key: 'member_name',
-			width: 2,
-		},
-		{
-			label: __('Quiz'),
-			key: 'quiz_title',
-			width: 2,
+			width: 1,
 		},
 		{
 			label: __('Score'),
